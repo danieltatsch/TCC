@@ -150,6 +150,69 @@ def cadastraSetor():
         fecha_mysql(cr,cnx)
         return jsonify({'ok': '1'}), 400
 
+# Garante que so exista um cenario com nome = cenario_nome
+@app.route('/inicio_cenario_medicao',methods=['POST'])
+def inicioCenarioMedicao():
+    if not request.json:
+        abort(400);
+    cenario_nome = request.json['cenario_nome']
+
+    (cr,cnx) = abre_mysql()
+
+    query = ("SELECT * FROM Cenario WHERE nome = ('%s')" % cenario_nome)
+    cr.execute(query)
+
+    if cr.rowcount == 0:
+        fecha_mysql(cr,cnx)
+        return jsonify({'ok': '1'}), 400
+
+    cenario_id = int (cr.fetchall()[0][0])
+
+    # se existir alguma medicao que nao encerrou ainda
+    query = ("SELECT fim FROM GerMedicao WHERE idCenario = '%d' AND fim IS NULL" % cenario_id)
+    cr.execute(query)
+
+    if cr.rowcount != 0:
+        fecha_mysql(cr,cnx)
+        return jsonify({'ok': '1'}), 401
+
+    query = ("INSERT INTO GerMedicao (idCenario, inicio, fim) VALUES ('%d', NOW(), NULL)" % (cenario_id))
+    cr.execute(query)
+    cnx.commit()
+    fecha_mysql(cr,cnx)
+    return jsonify({'ok': '1'}), 201
+
+@app.route('/fim_cenario_medicao',methods=['POST'])
+def fimCenarioMedicao():
+	if not request.json:
+		abort(400);
+	cenario_nome = request.json['cenario_nome']
+	(cr,cnx) = abre_mysql()
+
+	query = ("SELECT * FROM Cenario WHERE nome = '%s'" % cenario_nome)
+	cr.execute(query)
+
+	if cr.rowcount == 0:
+	    fecha_mysql(cr,cnx)
+	    return jsonify({'ok': '1'}), 400
+
+	cenario_id = int (cr.fetchall()[0][0])
+	print "CENARIO ID: " + str(cenario_id)
+	query = ("SELECT * FROM GerMedicao WHERE idCenario = '%d' AND fim IS NULL" % cenario_id)
+	cr.execute(query)
+
+	# Caso nao exista uma medicao iniciada com idCenario ou caso ela ja tenha siod encerrada
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)
+		return jsonify({'ok': '1'}), 401
+
+	idGerMedicao = int (cr.fetchall()[0][0])
+
+	query = ("UPDATE GerMedicao SET fim = NOW() WHERE idGerMedicao = '%d'" % idGerMedicao)
+	cr.execute(query)
+	cnx.commit()
+	fecha_mysql(cr,cnx)
+	return jsonify({'ok': '1'}), 201
 
 # Fase de treino -> json.lugar valido
 # Fase de testes -> json.lugar: string que indica vazio
@@ -161,7 +224,7 @@ def insereMedicao():
     gateway_mac = request.json['gateway_mac']
     Nodo_mac    = request.json['nodo_mac']
     rssi        = request.json['rssi']
-    lugar       = request.json['lugar']
+    # lugar       = request.json['lugar']
 
     (cr,cnx) = abre_mysql()
 

@@ -2,10 +2,10 @@ import requests
 
 col = {}
 
-col['nodo_mac'] = 'macNodo4'
+col['cenario_nome'] = 'Sala'
 # col['gateway_lugar'] = 'xablau'
 
-url = 'http://localhost:5001/cadastra_nodo'
+url = 'http://localhost:5001/fim_cenario_medicao'
 r = requests.post(url, json = col)
 
 print(r)
