@@ -153,54 +153,59 @@ def cadastraSetor():
 # Garante que so exista um cenario com nome = cenario_nome
 @app.route('/inicio_cenario_medicao',methods=['POST'])
 def inicioCenarioMedicao():
-    if not request.json:
-        abort(400);
-    cenario_nome = request.json['cenario_nome']
-
-    (cr,cnx) = abre_mysql()
-
-    query = ("SELECT * FROM Cenario WHERE nome = ('%s')" % cenario_nome)
-    cr.execute(query)
-
-    if cr.rowcount == 0:
-        fecha_mysql(cr,cnx)
-        return jsonify({'ok': '1'}), 400
-
-    cenario_id = int (cr.fetchall()[0][0])
-
-    # se existir alguma medicao que nao encerrou ainda
-    query = ("SELECT fim FROM GerMedicao WHERE idCenario = '%d' AND fim IS NULL" % cenario_id)
-    cr.execute(query)
-
-    if cr.rowcount != 0:
-        fecha_mysql(cr,cnx)
-        return jsonify({'ok': '1'}), 401
-
-    query = ("INSERT INTO GerMedicao (idCenario, inicio, fim) VALUES ('%d', NOW(), NULL)" % (cenario_id))
-    cr.execute(query)
-    cnx.commit()
-    fecha_mysql(cr,cnx)
-    return jsonify({'ok': '1'}), 201
-
-@app.route('/fim_cenario_medicao',methods=['POST'])
-def fimCenarioMedicao():
 	if not request.json:
 		abort(400);
 	cenario_nome = request.json['cenario_nome']
+	setor_nome = request.json['setor_nome']
 	(cr,cnx) = abre_mysql()
 
-	query = ("SELECT * FROM Cenario WHERE nome = '%s'" % cenario_nome)
+	query = ("SELECT * FROM Cenario WHERE nome = ('%s')" % cenario_nome)
+	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)
+		return jsonify({'ok': '1'}), 400
+
+	idCenario = int (cr.fetchall()[0][0])
+
+	# se existir alguma medicao que nao encerrou ainda
+	query = ("SELECT fim FROM GerMedicao WHERE idCenario = '%d' AND fim IS NULL" % idCenario)
+	cr.execute(query)
+
+	if cr.rowcount != 0:
+		fecha_mysql(cr,cnx)
+		return jsonify({'ok': '1'}), 401
+
+	query = ("SELECT * FROM Setor WHERE nome = '%s'" % setor_nome)
 	cr.execute(query)
 
 	if cr.rowcount == 0:
-	    fecha_mysql(cr,cnx)
-	    return jsonify({'ok': '1'}), 400
+		fecha_mysql(cr,cnx)
+		return jsonify({'ok': '1'}), 402
 
-	cenario_id = int (cr.fetchall()[0][0])
-	print "CENARIO ID: " + str(cenario_id)
-	query = ("SELECT * FROM GerMedicao WHERE idCenario = '%d' AND fim IS NULL" % cenario_id)
+	idSetor = int (cr.fetchall()[0][0])
+
+	#Verificar se o Setor esta  presente no cenario em questao
+	query = ("SELECT * FROM CenarioSetor WHERE idCenario = '%d' AND idSetor = '%d'" % (idCenario, idSetor))
 	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)
+		return jsonify({'ok': '1'}), 403
 
+	query = ("INSERT INTO GerMedicao (idCenario, idSetor, inicio, fim) VALUES ('%d', '%d', NOW(), NULL)" % (idCenario, idSetor))
+	cr.execute(query)
+	cnx.commit()
+	fecha_mysql(cr,cnx)
+	return jsonify({'ok': '1'}), 201
+
+#COMO NO inicio_cenario_medicao JA PROIBE INICIAR MEDICAO MAIS DE UMA MEDICAO AO MESMO TEMPO, AQUI SO ENCERRA A MEDICAO ATUAL
+@app.route('/fim_cenario_medicao',methods=['POST'])
+def fimCenarioMedicao():
+	# if not request.json:
+	# 	abort(400);
+	(cr,cnx) = abre_mysql()
+
+	query = ("SELECT * FROM GerMedicao WHERE fim IS NULL")
+	cr.execute(query)
 	# Caso nao exista uma medicao iniciada com idCenario ou caso ela ja tenha siod encerrada
 	if cr.rowcount == 0:
 		fecha_mysql(cr,cnx)
@@ -219,34 +224,48 @@ def fimCenarioMedicao():
 # Com a string especial a selecao dos dados de treino e teste fica mais clara
 @app.route('/insere_medicao',methods=['POST'])
 def insereMedicao():
-    if not request.json:
-        abort(400);
-    gateway_mac = request.json['gateway_mac']
-    Nodo_mac    = request.json['nodo_mac']
-    rssi        = request.json['rssi']
-    # lugar       = request.json['lugar']
+	if not request.json:
+		abort(400);
+	gateway_mac = request.json['gateway_mac']
+	nodo_mac    = request.json['nodo_mac']
+	rssi        = request.json['rssi']
 
-    (cr,cnx) = abre_mysql()
+	(cr,cnx) = abre_mysql()
 
-    #Verifica se o gateway ja estacadastrado, se nao estiver, retorna cod de erro
-    query = ("SELECT * FROM Gateway WHERE mac = '%s'" % gateway_mac)
-    cr.execute(query)
-    if cr.rowcount == 0:
-        fecha_mysql(cr,cnx)         
-        return jsonify({'ok': '1'}), 400
+	query = ("SELECT NOW()")
+	cr.execute(query)
+	time_med = str(cr.fetchall()[0][0])
 
-    # Verifica se o Nodo ja esta cadastrado, se nao estiver, retorna cod de erro
-    query = ("SELECT * FROM Nodo WHERE mac = '%s'" % nodo_mac)
-    cr.execute(query)
-    if cr.rowcount == 0:
-        fecha_mysql(cr,cnx)         
-        return jsonify({'ok': '1'}), 400
+	#Verifica se existe algum GerMedicao em andamento
+	query = ("SELECT * FROM GerMedicao WHERE DATE_FORMAT(inicio, '%%Y %%m %%d %%H %%i %%S') < DATE_FORMAT('%s', '%%Y %%m %%d %%H %%i %%S') AND fim IS NULL" % time_med)
+	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)
+		return jsonify({'ok': '1'}), 400
 
-    query = ("INSERT INTO Medicao (Gateway_mac, Nodo_mac, rssi, Lugar_nome, data) VALUES ('%s','%s','%d', NOW())" % (gateway_mac, nodo_mac, rssi))
-    cr.execute(query)
-    cnx.commit()
-    fecha_mysql(cr,cnx)
-    return jsonify({'ok': '1'}), 201
+	idGerMed = cr.fetchall()[0][0]
+
+	#Verifica se o gateway ja esta cadastrado, se nao estiver, retorna cod de erro
+	query = ("SELECT * FROM Gateway WHERE mac = '%s'" % gateway_mac)
+	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)         
+		return jsonify({'ok': '1'}), 401
+	idGateway = int (cr.fetchall()[0][0])    
+
+	# Verifica se o Nodo ja esta cadastrado, se nao estiver, retorna cod de erro
+	query = ("SELECT * FROM Nodo WHERE mac = '%s'" % nodo_mac)
+	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)         
+		return jsonify({'ok': '1'}), 402
+	idNodo = int (cr.fetchall()[0][0])
+
+	query = ("INSERT INTO Medicao (idGateway, idNodo, rssi, data, idGerMedicao) VALUES ('%d','%d','%d','%s','%d')" % (idGateway, idNodo, rssi, time_med, idGerMed))
+	cr.execute(query)
+	cnx.commit()
+	fecha_mysql(cr,cnx)
+	return jsonify({'ok': '1'}), 201
 
 @app.errorhandler(404)
 def not_found(error):
