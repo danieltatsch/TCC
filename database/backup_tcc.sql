@@ -26,7 +26,7 @@ CREATE TABLE `Cenario` (
   `idCenario` int(11) NOT NULL AUTO_INCREMENT,
   `nome` varchar(45) NOT NULL,
   PRIMARY KEY (`idCenario`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -35,7 +35,7 @@ CREATE TABLE `Cenario` (
 
 LOCK TABLES `Cenario` WRITE;
 /*!40000 ALTER TABLE `Cenario` DISABLE KEYS */;
-INSERT INTO `Cenario` VALUES (1,'Sala');
+INSERT INTO `Cenario` VALUES (1,'Sala'),(2,'teste');
 /*!40000 ALTER TABLE `Cenario` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -51,7 +51,6 @@ CREATE TABLE `CenarioSetor` (
   `idSetor` int(11) NOT NULL,
   PRIMARY KEY (`idCenario`,`idSetor`),
   KEY `fk_Cenario_has_Setor_Setor1_idx` (`idSetor`),
-  KEY `fk_Cenario_has_Setor_Cenario1_idx` (`idCenario`),
   CONSTRAINT `fk_Cenario_has_Setor_Cenario1` FOREIGN KEY (`idCenario`) REFERENCES `Cenario` (`idCenario`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_Cenario_has_Setor_Setor1` FOREIGN KEY (`idSetor`) REFERENCES `Setor` (`idSetor`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -101,13 +100,16 @@ DROP TABLE IF EXISTS `GerMedicao`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `GerMedicao` (
   `idGerMedicao` int(11) NOT NULL AUTO_INCREMENT,
-  `idCenario` int(11) NOT NULL,
   `inicio` datetime NOT NULL,
-  `fim` datetime NOT NULL,
+  `fim` datetime DEFAULT NULL,
+  `idCenario` int(11) NOT NULL,
+  `idSetor` int(11) NOT NULL,
   PRIMARY KEY (`idGerMedicao`),
   KEY `fk_GerMedicao_Cenario1_idx` (`idCenario`),
-  CONSTRAINT `fk_GerMedicao_Cenario1` FOREIGN KEY (`idCenario`) REFERENCES `Cenario` (`idCenario`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='\n';
+  KEY `fk_GerMedicao_Setor1_idx` (`idSetor`),
+  CONSTRAINT `fk_GerMedicao_Cenario1` FOREIGN KEY (`idCenario`) REFERENCES `Cenario` (`idCenario`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_GerMedicao_Setor1` FOREIGN KEY (`idSetor`) REFERENCES `Setor` (`idSetor`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8 COMMENT='\n';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -116,6 +118,7 @@ CREATE TABLE `GerMedicao` (
 
 LOCK TABLES `GerMedicao` WRITE;
 /*!40000 ALTER TABLE `GerMedicao` DISABLE KEYS */;
+INSERT INTO `GerMedicao` VALUES (15,'2019-03-10 21:23:03',NULL,1,9);
 /*!40000 ALTER TABLE `GerMedicao` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -130,20 +133,17 @@ CREATE TABLE `Medicao` (
   `idMedicao` int(11) NOT NULL AUTO_INCREMENT,
   `rssi` int(11) NOT NULL,
   `data` datetime NOT NULL,
-  `idSetor` int(11) NOT NULL,
   `idGateway` int(11) NOT NULL,
   `idNodo` int(11) NOT NULL,
   `idGerMedicao` int(11) NOT NULL,
   PRIMARY KEY (`idMedicao`),
-  KEY `fk_Medicao_Setor1_idx` (`idSetor`),
   KEY `fk_Medicao_Gateway1_idx` (`idGateway`),
   KEY `fk_Medicao_Nodo1_idx` (`idNodo`),
   KEY `fk_Medicao_GerMedicao1_idx` (`idGerMedicao`),
   CONSTRAINT `fk_Medicao_Gateway1` FOREIGN KEY (`idGateway`) REFERENCES `Gateway` (`idGateway`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_Medicao_GerMedicao1` FOREIGN KEY (`idGerMedicao`) REFERENCES `GerMedicao` (`idGerMedicao`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT `fk_Medicao_Nodo1` FOREIGN KEY (`idNodo`) REFERENCES `Nodo` (`idNodo`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT `fk_Medicao_Setor1` FOREIGN KEY (`idSetor`) REFERENCES `Setor` (`idSetor`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  CONSTRAINT `fk_Medicao_Nodo1` FOREIGN KEY (`idNodo`) REFERENCES `Nodo` (`idNodo`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -152,6 +152,7 @@ CREATE TABLE `Medicao` (
 
 LOCK TABLES `Medicao` WRITE;
 /*!40000 ALTER TABLE `Medicao` DISABLE KEYS */;
+INSERT INTO `Medicao` VALUES (1,-80,'2019-03-10 21:24:23',1,1,15),(2,-85,'2019-03-10 21:24:47',1,1,15),(3,-85,'2019-03-10 21:24:48',1,1,15),(4,-85,'2019-03-10 21:24:49',1,1,15),(5,-85,'2019-03-10 21:24:49',1,1,15),(6,-82,'2019-03-10 21:24:54',1,1,15),(7,-82,'2019-03-10 21:24:54',1,1,15),(8,-82,'2019-03-10 21:24:55',1,1,15),(9,-82,'2019-03-10 21:24:55',1,1,15);
 /*!40000 ALTER TABLE `Medicao` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -190,7 +191,7 @@ CREATE TABLE `Setor` (
   `idSetor` int(11) NOT NULL AUTO_INCREMENT,
   `nome` varchar(45) NOT NULL,
   PRIMARY KEY (`idSetor`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -212,4 +213,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2019-03-03 19:42:48
+-- Dump completed on 2019-03-10 21:32:21
