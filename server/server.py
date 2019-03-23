@@ -9,7 +9,6 @@ from flask import abort
 from flask import make_response
 from flask import request
 from flask import url_for
-# from flask_httpauth import HTTPBasicAuth
 # auth = HTTPBasicAuth()
 
 import mysql.connector
@@ -17,6 +16,8 @@ import subprocess
 import os
 import time
 import math
+import csv
+import io
 
 app = Flask(__name__)
 CORS(app)
@@ -146,7 +147,7 @@ def cadastraSetor():
         fecha_mysql(cr,cnx)
         return jsonify({'ok': '1'}), 201
     except mysql.connector.Error as error:
-        print "ERROR {}".format(error)
+        print ("ERROR {}".format(error))
         fecha_mysql(cr,cnx)
         return jsonify({'ok': '1'}), 400
 
@@ -229,6 +230,7 @@ def insereMedicao():
 	gateway_mac = request.json['gateway_mac']
 	nodo_mac    = request.json['nodo_mac']
 	rssi        = request.json['rssi']
+	count        = request.json['count']
 
 	(cr,cnx) = abre_mysql()
 
@@ -261,11 +263,86 @@ def insereMedicao():
 		return jsonify({'ok': '1'}), 402
 	idNodo = int (cr.fetchall()[0][0])
 
-	query = ("INSERT INTO Medicao (idGateway, idNodo, rssi, data, idGerMedicao) VALUES ('%d','%d','%d','%s','%d')" % (idGateway, idNodo, rssi, time_med, idGerMed))
+	query = ("INSERT INTO Medicao (idGateway, idNodo, rssi, data, idGerMedicao, count) VALUES ('%d','%d','%d','%s','%d','%d')" % (idGateway, idNodo, rssi, time_med, idGerMed, count))
 	cr.execute(query)
 	cnx.commit()
 	fecha_mysql(cr,cnx)
 	return jsonify({'ok': '1'}), 201
+
+@app.route('/gera_csv',methods=['POST'])
+def geraCsv():
+	if not request.json:
+	    abort(400);
+	cenario_nome = request.json['cenario_nome']
+	nodo_mac = request.json['nodo_mac']
+
+	#SELECIONAR DE ACORDO COM O CENARIO PASSADO COMO PARAMETRO
+	(cr,cnx) = abre_mysql()
+
+	query = ("SELECT * FROM Cenario WHERE nome = '%s'" % str(cenario_nome))
+	cr.execute(query)
+	if cr.rowcount == 0:
+	    fecha_mysql(cr,cnx)
+	    return jsonify({'ok': '1'}), 402
+
+	query = ("SELECT * FROM Nodo WHERE mac = '%s'" % str(nodo_mac))
+	cr.execute(query)
+	if cr.rowcount == 0:
+	    fecha_mysql(cr,cnx)
+	    return jsonify({'ok': '1'}), 401
+
+	query = ("SELECT m.idGateway, m.rssi, s.nome FROM Medicao m INNER JOIN GerMedicao g ON m.idGerMedicao = g.idGerMedicao INNER JOIN Setor s ON g.idSetor = s.idSetor")
+	cr.execute(query)
+	if cr.rowcount == 0:
+	    fecha_mysql(cr,cnx)
+	    return jsonify({'ok': '1'}), 403
+
+	result = cr.fetchall()
+
+	coletas = []
+	for c in result:
+	    coleta = {'gw': c[0], 'rssi': c[1], 'setor': c[2]}
+	    coletas.append(coleta)
+	# print(coletas)
+
+	c = coletas
+	rssi_list = []
+	s_list = []
+	res = {}
+
+	while(len(coletas) > 0):
+		x = c.pop()
+		rssi_list.insert(0, x['rssi'])
+		s_list.insert(0, x['setor'])
+
+	res['GW1'] = rssi_list[0::3]
+	res['GW2'] = rssi_list[1::3]
+	res['GW3'] = rssi_list[2::3]
+	res['Setor'] = s_list
+	# print(res)
+
+	out = []
+	o = {}
+	i = 0
+	while i < len(rssi_list):
+		o['GW1'] = rssi_list[i]
+		o['GW2'] = rssi_list[i+1]
+		o['GW3'] = rssi_list[i+2]
+		#na Medicao ja garante que vai ser o mesmo pra todos nesse intervalo de tempo
+		o['Setor'] = s_list[i] 
+		i = i + 3
+		print(o)
+		out.insert(0, o.copy())
+
+	with open('csv_TESTE2.csv', 'w', newline='') as csvfile:
+	    fieldnames = ['GW1', 'GW2', 'GW3', 'Setor']
+	    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+	    writer.writeheader()
+	    writer.writerows(out)    
+
+	fecha_mysql(cr,cnx)
+	return jsonify({'ok': '1'}), 201
+
 
 @app.errorhandler(404)
 def not_found(error):
