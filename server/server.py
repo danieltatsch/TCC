@@ -291,48 +291,25 @@ def geraCsv():
 	    fecha_mysql(cr,cnx)
 	    return jsonify({'ok': '1'}), 401
 
-	query = ("SELECT m.idGateway, m.rssi, s.nome FROM Medicao m INNER JOIN GerMedicao g ON m.idGerMedicao = g.idGerMedicao INNER JOIN Setor s ON g.idSetor = s.idSetor")
+	query = ("SELECT fim FROM GerMedicao g INNER JOIN Cenario c ON g.idCenario = c.idCenario WHERE c.nome = '%s' AND fim IS NULL" % str(cenario_nome))
+	cr.execute(query)
+
+	if cr.rowcount != 0:
+	    fecha_mysql(cr,cnx)
+	    return jsonify({'ok': '1'}), 405
+
+	query = ("SELECT m.idGateway, m.rssi, s.nome, m.count FROM Medicao m INNER JOIN GerMedicao g ON m.idGerMedicao = g.idGerMedicao INNER JOIN Setor s ON g.idSetor = s.idSetor WHERE g.idGerMedicao = (SELECT MAX(idGerMedicao) From GerMedicao)")
 	cr.execute(query)
 	if cr.rowcount == 0:
 	    fecha_mysql(cr,cnx)
 	    return jsonify({'ok': '1'}), 403
 
 	result = cr.fetchall()
+	# print("O QUE VEIO DO SELECT: " + str(result))
+	# result = [(1, -43, 'mesa', 1), (3, -70, 'mesa', 0), (2, -63, 'mesa', 1), (3, -91, 'mesa', 1), (1, -63, 'mesa', 0), (1, -49, 'mesa', 2), (2, -59, 'mesa', 2), (3, -85, 'mesa', 2), (2, -47, 'mesa', 3), (3, -88, 'mesa', 3), (1, -33, 'mesa', 4), (2, -55, 'mesa', 4), (3, -94, 'mesa', 4) , (3, -94, 'mesa', 5), (3, -94, 'mesa', 5), (2, -88, 'telefone', 6), (1, -99, 'telefone', 6), (3, -77, 'telefone', 6), (3, -22, 'telefone', 7), (1, -33, 'telefone', 7), (2, -44, 'telefone', 7)]
+	# print("INVENTADO: " + str(result))
 
-	coletas = []
-	for c in result:
-	    coleta = {'gw': c[0], 'rssi': c[1], 'setor': c[2]}
-	    coletas.append(coleta)
-	# print(coletas)
-
-	c = coletas
-	rssi_list = []
-	s_list = []
-	res = {}
-
-	while(len(coletas) > 0):
-		x = c.pop()
-		rssi_list.insert(0, x['rssi'])
-		s_list.insert(0, x['setor'])
-
-	res['GW1'] = rssi_list[0::3]
-	res['GW2'] = rssi_list[1::3]
-	res['GW3'] = rssi_list[2::3]
-	res['Setor'] = s_list
-	# print(res)
-
-	out = []
-	o = {}
-	i = 0
-	while i < len(rssi_list):
-		o['GW1'] = rssi_list[i]
-		o['GW2'] = rssi_list[i+1]
-		o['GW3'] = rssi_list[i+2]
-		#na Medicao ja garante que vai ser o mesmo pra todos nesse intervalo de tempo
-		o['Setor'] = s_list[i] 
-		i = i + 3
-		print(o)
-		out.insert(0, o.copy())
+	out = parseToCSV(result)
 
 	with open('csv_TESTE2.csv', 'w', newline='') as csvfile:
 	    fieldnames = ['GW1', 'GW2', 'GW3', 'Setor']
@@ -343,10 +320,64 @@ def geraCsv():
 	fecha_mysql(cr,cnx)
 	return jsonify({'ok': '1'}), 201
 
-
 @app.errorhandler(404)
 def not_found(error):
     return make_response(jsonify({'error': 'Not found'}), 404)
+
+def parseToCSV(result):
+	a = []
+
+	# pega os valores dos contadores das coletas
+	for i in result:
+		a.append(i[3])	
+
+	# ordena e tira valores repetidos
+	b = sorted(set(a))
+	c = b.copy()
+
+	# verifica se todos os gws tem valor do contador e os exclui senao tiverem
+	i = 0
+	while i <= max(b):
+		count = a.count(i)
+		if count != 3:
+			c.remove(i)
+		i += 1
+	# pega somente as tuplas com valores de count correspondentes a c
+	prev = [elem for elem in result if elem[3] in c]
+
+	# ordena lista de tuplas de acordo com idGateway	
+	prev = sorted(prev, key=lambda x: x[0])
+
+	d = {}
+	
+	d['GW1'] = []
+	d['GW2'] = []
+	d['GW3'] = []
+	d['Setor'] = []
+	
+	# preenche os valores de rssi dos gws em suas respectivas listas
+	for i in prev:
+		if i[0] == 1:
+			d['GW1'].append(i[1])
+		if i[0] == 2:
+			d['GW2'].append(i[1])
+		if i[0] == 3:
+			d['GW3'].append(i[1])		
+		d['Setor'].append(i[2])
+	print("RSSI POR GWs: " + str(d))
+	
+	out = []
+	o = {}
+	i = 0
+	while i < len(d['GW1']):
+		o['GW1'] = d['GW1'][i]
+		o['GW2'] = d['GW2'][i]
+		o['GW3'] = d['GW3'][i]
+		o['Setor'] = d['Setor'][i]
+		i += 1
+		print(o)
+		out.insert(0, o.copy())
+	return out
 
 if __name__ == "__main__":
     print ("Servidor no ar!")
