@@ -10,7 +10,7 @@ from flask import make_response
 from flask import request
 from flask import url_for
 # auth = HTTPBasicAuth()
-
+#import std
 import mysql.connector
 import subprocess
 import os
@@ -18,7 +18,6 @@ import time
 import math
 import csv
 import io
-import sys
 
 app = Flask(__name__)
 CORS(app)
@@ -247,11 +246,12 @@ def fimCenarioMedicao():
 def insereMedicao():
 	if not request.json:
 		abort(400);
-	print(request.json, file=sys.stderr)
 	gateway_mac = request.json['gateway_mac']
 	nodo_mac    = request.json['nodo_mac']
 	rssi        = request.json['rssi']
-	count       = request.json['count']
+	count        = request.json['count']
+        
+        #print(request.json, file=std.err)
 
 	(cr,cnx) = abre_mysql()
 
@@ -281,7 +281,7 @@ def insereMedicao():
 	cr.execute(query)
 	if cr.rowcount == 0:
 		fecha_mysql(cr,cnx)         
-		return jsonify({'ok': '1'})
+		return jsonify({'ok': '1'}), 402
 	idNodo = int (cr.fetchall()[0][0])
 
 	query = ("INSERT INTO Medicao (idGateway, idNodo, rssi, data, idGerMedicao, count) VALUES ('%d','%d','%d','%s','%d','%d')" % (idGateway, idNodo, rssi, time_med, idGerMed, count))
