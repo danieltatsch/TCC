@@ -12,8 +12,8 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 
-static char* ssid           = "APT 101";
-static char* password       = "18031999";
+static char* ssid           = "duda";
+static char* password       = "duda5743";
 static bool  device_scanned = false;
 int counter = 0;
 
@@ -74,7 +74,7 @@ void send_data(){
 
     HTTPClient http;
     
-    http.begin("http://192.168.0.14:5001/insere_medicao");
+    http.begin("http://192.168.0.13:5001/insere_medicao");
     http.addHeader("Content-Type", "application/json");
 
     int httpCode = http.POST(JSONmessageBuffer);   //Send the request
@@ -126,6 +126,7 @@ void setup(){
     Serial.begin(115200);
     Serial.println("ESP32 BLE Scanner");
   #endif
+  BLEDevice::init("");
 }
 void loop(){
   #ifdef SERIAL_PRINT
@@ -133,7 +134,7 @@ void loop(){
     Serial.printf("Start BLE scan for %d seconds...\n", SCAN_TIME);
   #endif
   
-  BLEDevice::init("");
+//  BLEDevice::init("");
   
   BLEScan *pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
