@@ -1,4 +1,4 @@
-#define SCAN_TIME  10 // seconds
+#define SCAN_TIME  20  // seconds
 #define EEPROM_SIZE 1
 
 // comment the follow line to disable serial message
@@ -15,10 +15,13 @@
 
 #include <EEPROM.h>
 
-static char* ssid           = "duda";
-static char* password       = "duda5743";
+static char* ssid           = "daniel";
+static char* password       = "v3gLNNK9";
 static bool  device_scanned = false;
 static int counter = 0;
+int ADV_INTERVAL = 4;
+static long int inicio, fim = 0;
+static boolean atualiza_inicio = false;
 
 /*
   COUNTER_ADDR controla o endereco que sera lido da memoria
@@ -87,7 +90,7 @@ void send_data() {
 
   HTTPClient http;
 
-  http.begin("http://192.168.0.13:5001/insere_medicao");
+  http.begin("http://192.168.0.14 ':5001/insere_medicao");
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.POST(JSONmessageBuffer);   //Send the request
@@ -116,12 +119,7 @@ void send_data() {
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
       if (advertisedDevice.haveServiceUUID() && advertisedDevice.getServiceUUID().equals(serviceUUID)) {
-        //        advertisedDevice.getScan()->stop();
-
         adv_data.advertisedDevice = advertisedDevice;
-        //        adv_data.nodo_mac = advertisedDevice.getAddress().toString().c_str();
-        //        adv_data.rssi = advertisedDevice.getRSSI();
-
 #ifdef SERIAL_PRINT
         Serial.printf("-------------------------------\n");
         Serial.printf("Advertised Device: %s\n", advertisedDevice.getName().c_str());
@@ -162,13 +160,18 @@ void setup() {
   Serial.println("ESP32 BLE Scanner");
 #endif
   BLEDevice::init("");
+  inicio = millis();
 }
 void loop() {
+  if (atualiza_inicio){
+    inicio = millis();
+    atualiza_inicio = false;
+  }
 #ifdef SERIAL_PRINT
   Serial.printf("-------------------------------\n");
   Serial.printf("Start BLE scan for %d seconds...\n", SCAN_TIME);
 #endif
-
+//  inicio = millis();
   BLEScan *pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
@@ -178,10 +181,16 @@ void loop() {
   BLEScanResults foundDevices = pBLEScan->start(SCAN_TIME); //start scan
 
   if (device_scanned) {
+    fim = millis();
+    int aux = (fim - inicio)/1000;
+    counter += aux/ADV_INTERVAL;
+    Serial.print("Valor incrementado de counter: ");
+    Serial.println((aux/ADV_INTERVAL));
     connect_wifi();
     send_data();
     WiFi.disconnect();
     device_scanned = false;
+    atualiza_inicio = true;
   }
 
 #ifdef SERIAL_PRINT
