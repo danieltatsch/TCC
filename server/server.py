@@ -290,6 +290,58 @@ def insereMedicao():
 	fecha_mysql(cr,cnx)
 	return jsonify({'ok': '1'})
 
+@app.route('/insere_medicao2',methods=['POST'])
+def insereMedicao2():
+	if not request.json:
+		abort(400);
+	print(request.json, file=sys.stderr)
+	gateway_mac = request.json['gateway_mac']
+	nodo_mac    = request.json['nodo_mac']
+	rssi_vector = request.json['rssi_vector']
+
+	(cr,cnx) = abre_mysql()
+
+	query = ("SELECT NOW()")
+	cr.execute(query)
+	time_med = str(cr.fetchall()[0][0])
+
+	#Verifica se existe algum GerMedicao em andamento
+	query = ("SELECT * FROM GerMedicao WHERE DATE_FORMAT(inicio, '%%Y %%m %%d %%H %%i %%S') < DATE_FORMAT('%s', '%%Y %%m %%d %%H %%i %%S') AND fim IS NULL" % time_med)
+	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)
+		return jsonify({'ok': '1'}), 400
+
+	idGerMed = cr.fetchall()[0][0]
+
+	#Verifica se o gateway ja esta cadastrado, se nao estiver, retorna cod de erro
+	query = ("SELECT * FROM Gateway WHERE mac = '%s'" % gateway_mac)
+	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)         
+		return jsonify({'ok': '1'}), 401
+	idGateway = int (cr.fetchall()[0][0])    
+
+	# Verifica se o Nodo ja esta cadastrado, se nao estiver, retorna cod de erro
+	query = ("SELECT * FROM Nodo WHERE mac = '%s'" % nodo_mac)
+	cr.execute(query)
+	if cr.rowcount == 0:
+		fecha_mysql(cr,cnx)         
+		return jsonify({'ok': '1'})
+	idNodo = int (cr.fetchall()[0][0])
+
+	i = 0
+	while i < len(rssi_vector):
+		if rssi_vector[i] != 0:
+			query = ("INSERT INTO Medicao (idGateway, idNodo, rssi, data, idGerMedicao, count) VALUES ('%d','%d','%d','%s','%d','%d')" % (idGateway, idNodo, rssi_vector[i], time_med, idGerMed, i))
+			cr.execute(query)
+
+	cnx.commit()
+	fecha_mysql(cr,cnx)
+	return jsonify({'ok': '1'})
+
+
+
 @app.route('/gera_csv',methods=['POST'])
 def geraCsv():
 	if not request.json:
