@@ -1,3 +1,7 @@
+#include <WiFi.h>
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
@@ -8,16 +12,14 @@
 
 static BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
 
-static char*  ssid          = "daniel";
-static char*  password      = "v3gLNNK9";
+static char*  ssid          = "duda";
+static char*  password      = "duda5743";
 
-static String nodo_mac      = "00:15:85:14:9c:09";
-static String gateway_mac   = WiFi.macAddress();
+static String nodo_mac      = "C8:FD:19:07:F2:29";
 
-
-static int    max_counter   = 50; // quantidade de dados de advertising escaneadas
-static int    max_time_wait = 4;  // intervalo de advertising
-static long int inicio, fim = 0;  // controle de timeout para incrementar counter
+static const int    max_counter   = 20; // quantidade de dados de advertising escaneadas
+static int          max_time_wait = 4;  // intervalo de advertising
+static long int     inicio, fim   = 0;  // controle de timeout para incrementar counter
 
 int32_t rssi_vector[max_counter]    = {0};
 uint32_t counter                    = 0;
@@ -33,8 +35,8 @@ bool connect_wifi() {
     #endif
   }
   if (WiFi.status() == WL_CONNECTED) {
-    IPAddress ip;
-    ip = WiFi.localIP();
+//    IPAddress ip;
+//    ip = WiFi.localIP();
 
     #ifdef SERIAL_PRINT
       Serial.println("Conectado, enviando dados dos sensores");
@@ -48,21 +50,21 @@ bool connect_wifi() {
   }
 }
 
-void send_data(int32_t rssi, uint32_t counter) {
+void send_data() {
   StaticJsonBuffer<1000> JSONbuffer;   //Declaring static JSON buffer
   JsonObject& JSONencoder = JSONbuffer.createObject();
 
+  String gateway_mac         = WiFi.macAddress();
   JSONencoder["gateway_mac"] = gateway_mac;
   JSONencoder["nodo_mac"]    = nodo_mac;
-  JSONencoder["rssi"]        = rssi
-  JSONencoder["count"]       = counter;
+  JSONencoder["rssi_vector"] = rssi_vector;
 
   char JSONmessageBuffer[1000];
   JSONencoder.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
 
   HTTPClient http;
 
-  http.begin("http://192.168.0.14 ':5001/insere_medicao");
+  http.begin("http://192.168.0.13 ':5001/insere_medicao2");
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.POST(JSONmessageBuffer);   //Send the request
@@ -86,10 +88,56 @@ void send_data(int32_t rssi, uint32_t counter) {
   }
 }
 
-void send_data(){
+void send_data2(int rssi, unsigned int counter) {
+  StaticJsonBuffer<1000> JSONbuffer;   //Declaring static JSON buffer
+  JsonObject& JSONencoder = JSONbuffer.createObject();
+  
+  String gateway_mac         = WiFi.macAddress();
+  JSONencoder["gateway_mac"] = gateway_mac;
+  JSONencoder["nodo_mac"]    = nodo_mac;
+  JSONencoder["rssi"]        = rssi;
+  JSONencoder["count"]       = counter;
+
+  char JSONmessageBuffer[1000];
+  JSONencoder.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+
+  HTTPClient http;
+
+  http.begin("http://192.168.0.13 ':5001/insere_medicao");
+  http.addHeader("Content-Type", "application/json");
+
+  int httpCode = http.POST(JSONmessageBuffer);   //Send the request
+
+  #ifdef SERIAL_PRINT
+    Serial.print("RETORNO http: ");
+    Serial.println(httpCode);
+  #endif
+
+  http.end();
+
+  if (httpCode == 200) {
+    #ifdef SERIAL_PRINT
+        Serial.println("DADOS ENVIADOS PARA O BANCO!");
+    #endif
+  }
+  else {
+    #ifdef SERIAL_PRINT
+        Serial.println("Erro no envio, ignorando dados.");
+    #endif
+  }
+}
+
+void connect_send(){
+  if (connect_wifi()){
+    send_data();
+    WiFi.disconnect();
+  }
+}
+
+void connect_send2(){
   connect_wifi();
   for (int i = 0; i < max_counter; i++){
-      if (rssi_vector[i] != 0) send_data(rssi_vector[i], i);    
+      if (rssi_vector[i] != 0) send_data2(rssi_vector[i], i);    
   }
   WiFi.disconnect();
 }
@@ -110,6 +158,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks{
           Serial.print("Valor incrementado de counter: ");
           Serial.println(increment_counter);
           Serial.printf("RSSI   : %d\n", advertisedDevice.getRSSI());
+          Serial.printf("Address: %s\n", advertisedDevice.getAddress().toString().c_str());
           Serial.printf("counter: %d\n", counter);
         #endif
       }
@@ -123,7 +172,7 @@ void setup(){
   #endif
 }
 void loop(){
-  if (counter == (max_counter)){
+  if (counter >= (max_counter)){
     #ifdef SERIAL_PRINT
       Serial.println("Vetor de RSSI: ");
       for (int i = 0; i < counter; i++){
@@ -132,7 +181,7 @@ void loop(){
         Serial.println(rssi_vector[i]);   
       }
     #endif
-//    send_data();
+    connect_send2();
     while (true){}
   }
   
