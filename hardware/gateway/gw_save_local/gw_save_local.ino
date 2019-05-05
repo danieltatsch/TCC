@@ -23,7 +23,7 @@ static long int     inicio, fim   = 0;  // controle de timeout para incrementar 
 
 int32_t  rssi_vector[max_counter] = {0};
 uint32_t counter                  = 0;
-
+uint8_t  start                    = 0;
 
 bool WIFI_Connect() {
   WiFi.begin(ssid, password); 
@@ -97,13 +97,13 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks{
     void onResult(BLEAdvertisedDevice advertisedDevice){
       if (advertisedDevice.haveServiceUUID() && advertisedDevice.getServiceUUID().equals(serviceUUID)) {
         advertisedDevice.getScan()->stop();
-        fim = millis();
         
+        fim                   = millis();
         int atraso            = (fim - inicio)/1000;
         int increment_counter = 1 + atraso/max_time_wait;
         counter               += increment_counter;
         rssi_vector[counter]  = advertisedDevice.getRSSI();
-                
+
         #ifdef SERIAL_PRINT
           Serial.printf("----------------\n");
           Serial.print("Valor incrementado de counter: ");
@@ -130,12 +130,22 @@ void BLE_StartScan(){
 }
 
 void CheckMeasurements(){
+  uint32_t     miss              = 0;
+  uint32_t     max_counter_total = max_counter - 1;
+  delay(500);
+  Serial.printf("----------------\n");
   Serial.println("Vetor de RSSI: ");
-  for (int i = 0; i < counter; i++){
+  for (int i = 1; i < max_counter; i++){
     Serial.print(i);
     Serial.print(": ");
-    Serial.println(rssi_vector[i]);   
+    Serial.println(rssi_vector[i]);
+    miss += (rssi_vector[i] == 0) ? 1 : 0; 
   }
+  Serial.printf("----------------\n");
+  Serial.print("Num de medidas esperadas : ");
+  Serial.println(max_counter_total);
+  Serial.print("Num de medidas realziadas: ");
+  Serial.println(max_counter_total - miss);
 }
 
 void setup(){  
@@ -145,11 +155,11 @@ void setup(){
   #endif
 }
 void loop(){
-  if (counter >= (max_counter)){
+  if (counter >= (max_counter-1)){
     #ifdef SERIAL_PRINT
       CheckMeasurements();
     #endif
-    connect_send();
+//    connect_send();
     while (true){}
   }
   
