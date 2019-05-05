@@ -8,26 +8,25 @@
 #include <BLEAdvertisedDevice.h>
 
 #define SCAN_TIME 30 // segundos
-#define SERIAL_PRINT // comente essa linha para desabilitar os prints
+#define SERIAL_PRINT // comentar essa linha para desabilitar os prints
 
-static BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
+static              BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
+BLEScan             *pBLEScan; // configura e inicia scan BLE
+static String       nodo_mac      = "C8:FD:19:07:F2:29";
 
-static char*  ssid          = "duda";
-static char*  password      = "duda5743";
-
-static String nodo_mac      = "C8:FD:19:07:F2:29";
+static char*        ssid          = "duda";
+static char*        password      = "duda5743";
 
 static const int    max_counter   = 20; // quantidade de dados de advertising escaneadas
 static int          max_time_wait = 4;  // intervalo de advertising
 static long int     inicio, fim   = 0;  // controle de timeout para incrementar counter
 
-int32_t rssi_vector[max_counter]    = {0};
-uint32_t counter                    = 0;
+int32_t  rssi_vector[max_counter] = {0};
+uint32_t counter                  = 0;
 
 
-bool connect_wifi() {
-  WiFi.begin(ssid, password);
-
+bool WIFI_Connect() {
+  WiFi.begin(ssid, password); 
   while (WiFi.status() != WL_CONNECTED) {
     delay(2000);
     #ifdef SERIAL_PRINT
@@ -35,9 +34,6 @@ bool connect_wifi() {
     #endif
   }
   if (WiFi.status() == WL_CONNECTED) {
-//    IPAddress ip;
-//    ip = WiFi.localIP();
-
     #ifdef SERIAL_PRINT
       Serial.println("Conectado, enviando dados dos sensores");
     #endif
@@ -50,46 +46,8 @@ bool connect_wifi() {
   }
 }
 
-void send_data() {
-  StaticJsonBuffer<1000> JSONbuffer;   //Declaring static JSON buffer
-  JsonObject& JSONencoder = JSONbuffer.createObject();
-
-  String gateway_mac         = WiFi.macAddress();
-  JSONencoder["gateway_mac"] = gateway_mac;
-  JSONencoder["nodo_mac"]    = nodo_mac;
-  JSONencoder["rssi_vector"] = rssi_vector;
-
-  char JSONmessageBuffer[1000];
-  JSONencoder.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
-
-  HTTPClient http;
-
-  http.begin("http://192.168.0.13 ':5001/insere_medicao2");
-  http.addHeader("Content-Type", "application/json");
-
-  int httpCode = http.POST(JSONmessageBuffer);   //Send the request
-
-  #ifdef SERIAL_PRINT
-    Serial.print("RETORNO http: ");
-    Serial.println(httpCode);
-  #endif
-
-  http.end();
-
-  if (httpCode == 200) {
-    #ifdef SERIAL_PRINT
-        Serial.println("DADOS ENVIADOS PARA O BANCO!");
-    #endif
-  }
-  else {
-    #ifdef SERIAL_PRINT
-        Serial.println("Erro no envio, ignorando dados.");
-    #endif
-  }
-}
-
-void send_data2(int rssi, unsigned int counter) {
-  StaticJsonBuffer<1000> JSONbuffer;   //Declaring static JSON buffer
+void HTTP_Post(int rssi, unsigned int counter) {
+  StaticJsonBuffer<1000> JSONbuffer;
   JsonObject& JSONencoder = JSONbuffer.createObject();
   
   String gateway_mac         = WiFi.macAddress();
@@ -106,7 +64,7 @@ void send_data2(int rssi, unsigned int counter) {
   http.begin("http://192.168.0.13 ':5001/insere_medicao");
   http.addHeader("Content-Type", "application/json");
 
-  int httpCode = http.POST(JSONmessageBuffer);   //Send the request
+  int httpCode = http.POST(JSONmessageBuffer); // envia request
 
   #ifdef SERIAL_PRINT
     Serial.print("RETORNO http: ");
@@ -128,16 +86,9 @@ void send_data2(int rssi, unsigned int counter) {
 }
 
 void connect_send(){
-  if (connect_wifi()){
-    send_data();
-    WiFi.disconnect();
-  }
-}
-
-void connect_send2(){
-  connect_wifi();
+  if (WIFI_Connect() == false) return;
   for (int i = 0; i < max_counter; i++){
-      if (rssi_vector[i] != 0) send_data2(rssi_vector[i], i);    
+      if (rssi_vector[i] != 0) HTTP_Post(rssi_vector[i], i);    
   }
   WiFi.disconnect();
 }
@@ -158,41 +109,51 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks{
           Serial.print("Valor incrementado de counter: ");
           Serial.println(increment_counter);
           Serial.printf("RSSI   : %d\n", advertisedDevice.getRSSI());
-          Serial.printf("Address: %s\n", advertisedDevice.getAddress().toString().c_str());
+          Serial.printf("MAC    : %s\n", advertisedDevice.getAddress().toString().c_str());
           Serial.printf("counter: %d\n", counter);
         #endif
       }
     }
 };
 
+void BLE_Init(){
+  BLEDevice::init(""); // inicia dispositivo BLE
+  pBLEScan = BLEDevice::getScan(); // cria scan BLE
+  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks()); //confgiura funcao de callback no scan de um beacon
+  pBLEScan->setActiveScan(true); //consome mais energia mas oferece scans mais rapidos
+  pBLEScan->setInterval(0x50);
+  pBLEScan->setWindow(0x30);
+}
+
+void BLE_StartScan(){
+  pBLEScan->start(SCAN_TIME); // inicia scan BLE durante o periodo de SCAN_TIME 
+}
+
+void CheckMeasurements(){
+  Serial.println("Vetor de RSSI: ");
+  for (int i = 0; i < counter; i++){
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.println(rssi_vector[i]);   
+  }
+}
+
 void setup(){  
   Serial.begin(115200);
   #ifdef SERIAL_PRINT
-    Serial.printf("Start BLE scan for %d seconds...\n", SCAN_TIME);
+    Serial.printf("Iniciando scan BLE durante %d segs...\n", SCAN_TIME);
   #endif
 }
 void loop(){
   if (counter >= (max_counter)){
     #ifdef SERIAL_PRINT
-      Serial.println("Vetor de RSSI: ");
-      for (int i = 0; i < counter; i++){
-        Serial.print(i);
-        Serial.print(": ");
-        Serial.println(rssi_vector[i]);   
-      }
+      CheckMeasurements();
     #endif
-    connect_send2();
+    connect_send();
     while (true){}
   }
   
-  BLEDevice::init("");
-  
-  BLEScan *pBLEScan = BLEDevice::getScan(); //create new scan
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
-  pBLEScan->setInterval(0x50);
-  pBLEScan->setWindow(0x30);
-  
-  inicio                      = millis();
-  BLEScanResults foundDevices = pBLEScan->start(SCAN_TIME); //start scan
+  BLE_Init();
+  inicio = millis();
+  BLE_StartScan();
 }
