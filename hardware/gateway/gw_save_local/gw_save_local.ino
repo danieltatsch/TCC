@@ -12,7 +12,7 @@
 
 static              BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
 BLEScan             *pBLEScan; // configura e inicia scan BLE
-static String       nodo_mac      = "C8:FD:19:07:F2:29";
+static String       nodo_mac      = "C8:FD:19:07:F2:29"; // so pra nao precisar pegar do dispositivo recebido e passar pra ca
 
 static char*        ssid          = "duda";
 static char*        password      = "duda5743";
