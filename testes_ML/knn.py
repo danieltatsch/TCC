@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors 		 import KNeighborsClassifier
 from sklearn.metrics 		 import confusion_matrix, classification_report
+from sklearn 				 import metrics
 
 plt.style.use('ggplot')
 
 #Carrega o dataset
-df = pd.read_csv('datasets/cancer.csv')
+df = pd.read_csv('datasets/bill_authentication.csv')
 
 #Print das 5 primeiras linhas
 print("----------------------------")
@@ -25,8 +26,8 @@ print("(linhas, colunas): " + str(df.shape))
 print("----------------------------")
 
 #Criando arrays separados para os dados e os resultados
-X = df.drop('diagnosis',axis=1).values #dados
-y = df['diagnosis'].values #resultados
+X = df.drop('Class',axis=1).values #dados
+y = df['Class'].values #resultados
 
 # print(X)
 # print(y)
@@ -67,15 +68,17 @@ plt.show()
 '''
 
 #Configura o classificador K-NN com 3 vizinhos
-knn = KNeighborsClassifier(n_neighbors=1)
+knn = KNeighborsClassifier(n_neighbors=3)
 
 #Ajusta os modelos
 knn.fit(X_train,y_train)
 
-print("Precisao: " + str(knn.score(X_test,y_test)))
-
 #Predicao utilizando o classificador anteriormente ajustado
 y_pred = knn.predict(X_test)
+
+print("Precisao: " + str(knn.score(X_test,y_test)))
+print("Precisao: " + str(metrics.accuracy_score(y_test,y_pred)))
+
 print("----------------------------")
 print("Matriz de confusao")
 # print(confusion_matrix(y_test,y_pred))
