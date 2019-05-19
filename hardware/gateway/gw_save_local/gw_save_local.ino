@@ -7,7 +7,7 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 
-#define SCAN_TIME 30 // segundos
+#define SCAN_TIME 60 // segundos
 #define SERIAL_PRINT // comentar essa linha para desabilitar os prints
 
 static              BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
@@ -24,6 +24,8 @@ static long int     inicio, fim   = 0;  // controle de timeout para incrementar 
 int32_t  rssi_vector[max_counter] = {0};
 uint32_t counter                  = 0;
 uint8_t  start                    = 0;
+uint8_t  LED                      = 2;
+int      increment_counter        = 0;
 
 bool WIFI_Connect() {
   WiFi.begin(ssid, password); 
@@ -44,6 +46,17 @@ bool WIFI_Connect() {
     #endif
     return false;
   }
+}
+
+void toggle_LED(uint16_t ligado, uint16_t desligado, uint8_t counter_loop){
+  uint8_t i = 0;
+  do{
+    digitalWrite(LED, HIGH);
+    delay(ligado);
+    digitalWrite(LED, LOW);
+    delay(desligado);
+    i ++;
+  } while(i < counter_loop);
 }
 
 void HTTP_Post(int rssi, unsigned int counter) {
@@ -100,10 +113,10 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks{
         
         fim                   = millis();
         int atraso            = (fim - inicio)/1000;
-        int increment_counter = 1 + atraso/max_time_wait;
+        increment_counter = 1 + atraso/max_time_wait;
         counter               += increment_counter;
         rssi_vector[counter]  = advertisedDevice.getRSSI();
-
+                
         #ifdef SERIAL_PRINT
           Serial.printf("----------------\n");
           Serial.print("Valor incrementado de counter: ");
@@ -150,20 +163,31 @@ void CheckMeasurements(){
 
 void setup(){  
   Serial.begin(115200);
+  pinMode(LED, OUTPUT);
   #ifdef SERIAL_PRINT
     Serial.printf("Iniciando scan BLE durante %d segs...\n", SCAN_TIME);
   #endif
 }
 void loop(){
+  if (increment_counter >= 10){ //se perder 10 trava aqui
+    while(true){
+      toggle_LED(2000, 2000, 0);  
+    }  
+  }
   if (counter >= (max_counter-1)){
     #ifdef SERIAL_PRINT
       CheckMeasurements();
     #endif
-//    connect_send();
-    while (true){}
+    digitalWrite(LED, HIGH);
+    connect_send();
+    digitalWrite(LED, LOW);
+    while (true){
+      toggle_LED(250,250, 0);  
+    }
   }
   
   BLE_Init();
   inicio = millis();
   BLE_StartScan();
+//  toggle_LED(10,240, 0);
 }
