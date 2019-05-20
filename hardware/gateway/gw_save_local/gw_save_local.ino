@@ -26,6 +26,7 @@ uint32_t counter                  = 0;
 uint8_t  start                    = 0;
 uint8_t  LED                      = 2;
 int      increment_counter        = 0;
+uint32_t miss                     = 0;
 
 bool WIFI_Connect() {
   WiFi.begin(ssid, password); 
@@ -143,22 +144,28 @@ void BLE_StartScan(){
 }
 
 void CheckMeasurements(){
-  uint32_t     miss              = 0;
-  uint32_t     max_counter_total = max_counter - 1;
+  miss = 0;
+  uint32_t max_counter_total = max_counter - 1;
   delay(500);
+#ifdef SERIAL_PRINT
   Serial.printf("----------------\n");
   Serial.println("Vetor de RSSI: ");
+#endif
   for (int i = 1; i < max_counter; i++){
+#ifdef SERIAL_PRINT
     Serial.print(i);
     Serial.print(": ");
     Serial.println(rssi_vector[i]);
-    miss += (rssi_vector[i] == 0) ? 1 : 0; 
+#endif
+    miss += (rssi_vector[i] == 0) ? 1 : 0;
   }
+#ifdef SERIAL_PRINT
   Serial.printf("----------------\n");
   Serial.print("Num de medidas esperadas : ");
   Serial.println(max_counter_total);
   Serial.print("Num de medidas realziadas: ");
   Serial.println(max_counter_total - miss);
+#endif
 }
 
 void setup(){  
@@ -169,21 +176,19 @@ void setup(){
   #endif
 }
 void loop(){
-  if (increment_counter >= 10){ //se perder 10 trava aqui
-    while(true){
-      toggle_LED(2000, 2000, 0);  
-    }  
-  }
   if (counter >= (max_counter-1)){
-    #ifdef SERIAL_PRINT
-      CheckMeasurements();
-    #endif
-    digitalWrite(LED, HIGH);
-    connect_send();
-    digitalWrite(LED, LOW);
-    while (true){
-      toggle_LED(250,250, 0);  
-    }
+    CheckMeasurements();
+    
+    //efetua o num de medidas que perdeu novamente
+    if (miss != 0){
+      max_counter += miss;
+      continue;
+    } else{  
+        digitalWrite(LED, HIGH);
+        connect_send();
+        digitalWrite(LED, LOW);
+        while (true) toggle_LED(250,250, 0);  
+      }
   }
   
   BLE_Init();
