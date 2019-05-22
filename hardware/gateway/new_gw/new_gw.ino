@@ -14,10 +14,10 @@ static              BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
 BLEScan             *pBLEScan; // configura e inicia scan BLE
 static String       nodo_mac      = "C8:FD:19:07:F2:29"; // so pra nao precisar pegar do dispositivo recebido e passar pra ca
 
-static char*        ssid          = "APT 101";
-static char*        password      = "18031999";
+static char*        ssid          = "duda";
+static char*        password      = "duda5743";
 
-static const int    max_counter   = 20; // quantidade de dados de advertising escaneadas
+static const int    max_counter   = 100; // quantidade de dados de advertising escaneadas
 static int          max_time_wait = 4;  // intervalo de advertising
 static long int     inicio, fim   = 0;  // controle de timeout para incrementar counter
 
@@ -81,7 +81,7 @@ void HTTP_Post(int rssi, unsigned int counter) {
 
   HTTPClient http;
 
-  http.begin("http://192.168.0.14 ':5001/insere_medicao");
+  http.begin("http://192.168.0.13 ':5001/insere_medicao");
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.POST(JSONmessageBuffer); // envia request
@@ -105,15 +105,43 @@ void HTTP_Post(int rssi, unsigned int counter) {
   }
 }
 
+int HTTP_GET() {
+  HTTPClient http;
+
+  http.begin("http://192.168.0.13 ':5001/dummy_get");
+  http.addHeader("Content-Type", "application/json");
+
+  int httpCode = http.GET(); // envia request
+
+  #ifdef SERIAL_PRINT
+    Serial.print("RETORNO http: ");
+    Serial.println(httpCode);
+  #endif
+
+  http.end();
+  return httpCode;
+}
+
 void connect_send(){
   static long int inicio, fim = 0;
   inicio = millis();
-  if (WIFI_Connect() == false) return;
+  if (WIFI_Connect() == false){
+    WiFi.disconnect();
+    return;
+  }
   HTTP_Post(adv_data.rssi, adv_data.counter);
   WiFi.disconnect();
   fim               =  millis();
   int atraso        =  (fim - inicio)/1000;
   counter           += atraso/max_time_wait;
+}
+
+// funcao chamada no setup para travar todos os gws
+// e inicar todos ao mesmo tempo
+void dummy_connection(){
+  WIFI_Connect();
+  while(HTTP_GET() != 200);
+  WiFi.disconnect();
 }
 
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks{
@@ -152,32 +180,19 @@ void BLE_StartScan(){
   pBLEScan->start(SCAN_TIME); // inicia scan BLE durante o periodo de SCAN_TIME 
 }
 
-//void CheckMeasurements(){
-//  uint32_t     miss              = 0;
-//  uint32_t     max_counter_total = max_counter - 1;
-//  delay(500);
-//  Serial.printf("----------------\n");
-//  Serial.println("Vetor de RSSI: ");
-//  for (int i = 1; i < max_counter; i++){
-//    Serial.print(i);
-//    Serial.print(": ");
-//    Serial.println(rssi_vector[i]);
-//    miss += (rssi_vector[i] == 0) ? 1 : 0; 
-//  }
-//  Serial.printf("----------------\n");
-//  Serial.print("Num de medidas esperadas : ");
-//  Serial.println(max_counter_total);
-//  Serial.print("Num de medidas realziadas: ");
-//  Serial.println(max_counter_total - miss);
-//}
-
 void setup(){  
   Serial.begin(115200);
   pinMode(LED, OUTPUT);
+
+  digitalWrite(LED, HIGH);
+  dummy_connection();
+  digitalWrite(LED, LOW);
+  
   #ifdef SERIAL_PRINT
     Serial.printf("Iniciando scan BLE durante %d segs...\n", SCAN_TIME);
   #endif
 }
+
 void loop(){
   BLE_Init();
   inicio = millis();
@@ -185,8 +200,9 @@ void loop(){
   
   //apos retorno da funcao de callback
   connect_send();
-#ifdef SERIAL_PRINT
-  Serial.print("Valor incrementado durante WIFI: ");
-  Serial.println(counter - adv_data.counter);
-#endif
+//#ifdef SERIAL_PRINT
+//  Serial.print("Valor incrementado durante WIFI: ");
+//  Serial.println(counter - adv_data.counter);
+//  Serial.println("Reiniciando scan BLE...");
+//#endif
 }

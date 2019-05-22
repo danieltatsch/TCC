@@ -17,11 +17,11 @@ static String       nodo_mac      = "C8:FD:19:07:F2:29"; // so pra nao precisar 
 static char*        ssid          = "duda";
 static char*        password      = "duda5743";
 
-static const int    max_counter   = 20; // quantidade de dados de advertising escaneadas
+static const int    max_counter   = 150; // quantidade de dados de advertising escaneadas
 static int          max_time_wait = 4;  // intervalo de advertising
 static long int     inicio, fim   = 0;  // controle de timeout para incrementar counter
 
-int32_t  rssi_vector[max_counter] = {0};
+int8_t   rssi_vector[max_counter] ={0};
 uint32_t counter                  = 0;
 uint8_t  start                    = 0;
 uint8_t  LED                      = 2;
@@ -99,11 +99,34 @@ void HTTP_Post(int rssi, unsigned int counter) {
   }
 }
 
+int HTTP_GET() {
+  HTTPClient http;
+
+  http.begin("http://192.168.0.13 ':5001/dummy_get");
+  http.addHeader("Content-Type", "application/json");
+
+  int httpCode = http.GET(); // envia request
+
+  #ifdef SERIAL_PRINT
+    Serial.print("RETORNO http: ");
+    Serial.println(httpCode);
+  #endif
+
+  http.end();
+  return httpCode;
+}
+
 void connect_send(){
   if (WIFI_Connect() == false) return;
-  for (int i = 0; i < max_counter; i++){
+  for (int i = 0; i <= max_counter; i++){
       if (rssi_vector[i] != 0) HTTP_Post(rssi_vector[i], i);    
   }
+  WiFi.disconnect();
+}
+
+void dummy_connection(){
+  WIFI_Connect();
+  while(HTTP_GET() != 200);
   WiFi.disconnect();
 }
 
@@ -145,13 +168,12 @@ void BLE_StartScan(){
 
 void CheckMeasurements(){
   miss = 0;
-  uint32_t max_counter_total = max_counter - 1;
   delay(500);
 #ifdef SERIAL_PRINT
   Serial.printf("----------------\n");
   Serial.println("Vetor de RSSI: ");
 #endif
-  for (int i = 1; i < max_counter; i++){
+  for (int i = 1; i <= max_counter; i++){
 #ifdef SERIAL_PRINT
     Serial.print(i);
     Serial.print(": ");
@@ -162,33 +184,32 @@ void CheckMeasurements(){
 #ifdef SERIAL_PRINT
   Serial.printf("----------------\n");
   Serial.print("Num de medidas esperadas : ");
-  Serial.println(max_counter_total);
+  Serial.println(max_counter);
   Serial.print("Num de medidas realziadas: ");
-  Serial.println(max_counter_total - miss);
+  Serial.println(max_counter - miss);
 #endif
 }
 
 void setup(){  
   Serial.begin(115200);
   pinMode(LED, OUTPUT);
+
+  digitalWrite(LED, HIGH);
+  dummy_connection();
+  digitalWrite(LED, LOW);
+  
   #ifdef SERIAL_PRINT
     Serial.printf("Iniciando scan BLE durante %d segs...\n", SCAN_TIME);
   #endif
 }
 void loop(){
-  if (counter >= (max_counter-1)){
+  if (counter >= max_counter){
     CheckMeasurements();
-    
-    //efetua o num de medidas que perdeu novamente
-    if (miss != 0){
-      max_counter += miss;
-      continue;
-    } else{  
-        digitalWrite(LED, HIGH);
-        connect_send();
-        digitalWrite(LED, LOW);
-        while (true) toggle_LED(250,250, 0);  
-      }
+
+    digitalWrite(LED, HIGH);
+    connect_send();
+    digitalWrite(LED, LOW);
+    while (true) toggle_LED(250,250, 0);  
   }
   
   BLE_Init();
