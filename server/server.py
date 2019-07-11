@@ -38,6 +38,10 @@ def fecha_mysql(cr, cnx):
     cr.close()
     cnx.close()
 
+@app.route('/dummy_get',methods=['GET'])
+def dummy_get():
+	return jsonify({'ok': '1'})
+
 @app.route('/retorna_gw',methods=['GET'])
 def retorna_gw():
 
@@ -247,11 +251,13 @@ def fimCenarioMedicao():
 def insereMedicao():
 	if not request.json:
 		abort(400);
-	print(request.json, file=sys.stderr)
+	# print(request.json, file=sys.stderr)
 	gateway_mac = request.json['gateway_mac']
 	nodo_mac    = request.json['nodo_mac']
 	rssi        = request.json['rssi']
 	count       = request.json['count']
+
+	print("RSSI: " + str(rssi) + ", COUNT: " + str(count))
 
 	(cr,cnx) = abre_mysql()
 
@@ -289,58 +295,6 @@ def insereMedicao():
 	cnx.commit()
 	fecha_mysql(cr,cnx)
 	return jsonify({'ok': '1'})
-
-@app.route('/insere_medicao2',methods=['POST'])
-def insereMedicao2():
-	if not request.json:
-		abort(400);
-	print(request.json, file=sys.stderr)
-	gateway_mac = request.json['gateway_mac']
-	nodo_mac    = request.json['nodo_mac']
-	rssi_vector = request.json['rssi_vector']
-
-	(cr,cnx) = abre_mysql()
-
-	query = ("SELECT NOW()")
-	cr.execute(query)
-	time_med = str(cr.fetchall()[0][0])
-
-	#Verifica se existe algum GerMedicao em andamento
-	query = ("SELECT * FROM GerMedicao WHERE DATE_FORMAT(inicio, '%%Y %%m %%d %%H %%i %%S') < DATE_FORMAT('%s', '%%Y %%m %%d %%H %%i %%S') AND fim IS NULL" % time_med)
-	cr.execute(query)
-	if cr.rowcount == 0:
-		fecha_mysql(cr,cnx)
-		return jsonify({'ok': '1'}), 400
-
-	idGerMed = cr.fetchall()[0][0]
-
-	#Verifica se o gateway ja esta cadastrado, se nao estiver, retorna cod de erro
-	query = ("SELECT * FROM Gateway WHERE mac = '%s'" % gateway_mac)
-	cr.execute(query)
-	if cr.rowcount == 0:
-		fecha_mysql(cr,cnx)         
-		return jsonify({'ok': '1'}), 401
-	idGateway = int (cr.fetchall()[0][0])    
-
-	# Verifica se o Nodo ja esta cadastrado, se nao estiver, retorna cod de erro
-	query = ("SELECT * FROM Nodo WHERE mac = '%s'" % nodo_mac)
-	cr.execute(query)
-	if cr.rowcount == 0:
-		fecha_mysql(cr,cnx)         
-		return jsonify({'ok': '1'})
-	idNodo = int (cr.fetchall()[0][0])
-
-	i = 0
-	while i < len(rssi_vector):
-		if rssi_vector[i] != 0:
-			query = ("INSERT INTO Medicao (idGateway, idNodo, rssi, data, idGerMedicao, count) VALUES ('%d','%d','%d','%s','%d','%d')" % (idGateway, idNodo, rssi_vector[i], time_med, idGerMed, i))
-			cr.execute(query)
-
-	cnx.commit()
-	fecha_mysql(cr,cnx)
-	return jsonify({'ok': '1'})
-
-
 
 @app.route('/gera_csv',methods=['POST'])
 def geraCsv():
@@ -384,7 +338,7 @@ def geraCsv():
 
 	out = parseToCSV(result)
 
-	with open('csv_TESTE2.csv', 'w', newline='') as csvfile:
+	with open('cen2_s17_NOVO_2.csv', 'w', newline='') as csvfile:
 	    fieldnames = ['GW1', 'GW2', 'GW3', 'Setor']
 	    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 	    writer.writeheader()
@@ -404,22 +358,30 @@ def parseToCSV(result):
 	for i in result:
 		a.append(i[3])	
 
+	print("a: " + str(a))
+
 	# ordena e tira valores repetidos
 	b = sorted(set(a))
-	c = b.copy()
+	c = list(b)
+
+	print("c: " + str(c))
 
 	# verifica se todos os gws tem valor do contador e os exclui senao tiverem
-	i = 0
+	i = min(c)
 	while i <= max(b):
 		count = a.count(i)
-		if count != 3:
+		if count != 0 and count != 3:
+			# print("VALORR DE I: " + str(i))
 			c.remove(i)
 		i += 1
+
+	prev = []
 	# pega somente as tuplas com valores de count correspondentes a c
-	prev = [elem for elem in result if elem[3] in c]
+	# prev = [elem for elem in result if elem[3] in c]
+	x = [elem for elem in result if elem[3] in c]
 
 	# ordena lista de tuplas de acordo com idGateway	
-	prev = sorted(prev, key=lambda x: x[0])
+	prev = sorted(x, key=lambda x: x[0])
 
 	d = {}
 	
@@ -430,11 +392,11 @@ def parseToCSV(result):
 	
 	# preenche os valores de rssi dos gws em suas respectivas listas
 	for i in prev:
-		if i[0] == 1:
+		if i[0] == 5:
 			d['GW1'].append(i[1])
-		if i[0] == 2:
+		if i[0] == 7:
 			d['GW2'].append(i[1])
-		if i[0] == 3:
+		if i[0] == 8:
 			d['GW3'].append(i[1])		
 		d['Setor'].append(i[2])
 	print("RSSI POR GWs: " + str(d))
