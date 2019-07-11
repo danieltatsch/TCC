@@ -7,19 +7,19 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 
-#define SCAN_TIME 60 // segundos
-#define SERIAL_PRINT // comentar essa linha para desabilitar os prints
+#define SCAN_TIME 600 // segundos
+//#define SERIAL_PRINT // comentar essa linha para desabilitar os prints
 
 static              BLEUUID serviceUUID("0000ffe0-0000-1000-8000-00805f9b34fb");
 BLEScan             *pBLEScan; // configura e inicia scan BLE
 static String       nodo_mac      = "C8:FD:19:07:F2:29"; // so pra nao precisar pegar do dispositivo recebido e passar pra ca
 
-static char*        ssid          = "duda";
-static char*        password      = "duda5743";
+static char*        ssid          = "dd-wrt";
+static char*        password      = "";
 
-static const int    max_counter   = 150; // quantidade de dados de advertising escaneadas
-static int          max_time_wait = 4;  // intervalo de advertising
-static long int     inicio, fim   = 0;  // controle de timeout para incrementar counter
+static const uint16_t    max_counter   = 400; // quantidade de dados de advertising escaneadas
+static int               max_time_wait = 2;  // intervalo de advertising
+static long int          inicio, fim   = 0;  // controle de timeout para incrementar counter
 
 int8_t   rssi_vector[max_counter] ={0};
 uint32_t counter                  = 0;
@@ -32,19 +32,22 @@ bool WIFI_Connect() {
   WiFi.begin(ssid, password); 
   while (WiFi.status() != WL_CONNECTED) {
     delay(2000);
-    #ifdef SERIAL_PRINT
-      Serial.println("Conectando com rede Wi-Fi...");
-    #endif
+#ifdef SERIAL_PRINT
+    Serial.println("Conectando com rede Wi-Fi...");
+#endif
   }
   if (WiFi.status() == WL_CONNECTED) {
-    #ifdef SERIAL_PRINT
-      Serial.println("Conectado, enviando dados dos sensores");
-    #endif
+#ifdef SERIAL_PRINT
+    String gateway_mac = WiFi.macAddress();
+    Serial.print("GW MAC: ");
+    Serial.println(gateway_mac);
+    Serial.println("Conectado, enviando dados dos sensores");
+#endif
     return true;
   } else {
-    #ifdef SERIAL_PRINT
+#ifdef SERIAL_PRINT
       Serial.println("Erro na conexão!");
-    #endif
+#endif
     return false;
   }
 }
@@ -65,6 +68,8 @@ void HTTP_Post(int rssi, unsigned int counter) {
   JsonObject& JSONencoder = JSONbuffer.createObject();
   
   String gateway_mac         = WiFi.macAddress();
+//  Serial.print("GW MAC: ");
+//  Serial.println(gateway_mac);
   JSONencoder["gateway_mac"] = gateway_mac;
   JSONencoder["nodo_mac"]    = nodo_mac;
   JSONencoder["rssi"]        = rssi;
@@ -75,48 +80,33 @@ void HTTP_Post(int rssi, unsigned int counter) {
 
   HTTPClient http;
 
-  http.begin("http://192.168.0.13 ':5001/insere_medicao");
+  http.begin("http://192.168.1.108 ':5001/insere_medicao");
   http.addHeader("Content-Type", "application/json");
 
-  int httpCode = http.POST(JSONmessageBuffer); // envia request
-
-  #ifdef SERIAL_PRINT
-    Serial.print("RETORNO http: ");
-    Serial.println(httpCode);
-  #endif
-
+  while(http.POST(JSONmessageBuffer) == 400);
+  
   http.end();
-
-  if (httpCode == 200) {
-    #ifdef SERIAL_PRINT
-        Serial.println("DADOS ENVIADOS PARA O BANCO!");
-    #endif
-  }
-  else {
-    #ifdef SERIAL_PRINT
-        Serial.println("Erro no envio, ignorando dados.");
-    #endif
-  }
 }
 
 int HTTP_GET() {
   HTTPClient http;
-
-  http.begin("http://192.168.0.13 ':5001/dummy_get");
+  
+  http.begin("http://192.168.1.108 ':5001/dummy_get");
   http.addHeader("Content-Type", "application/json");
 
   int httpCode = http.GET(); // envia request
 
-  #ifdef SERIAL_PRINT
-    Serial.print("RETORNO http: ");
-    Serial.println(httpCode);
-  #endif
+#ifdef SERIAL_PRINT
+  Serial.print("RETORNO http: ");
+  Serial.println(httpCode);
+#endif
 
   http.end();
   return httpCode;
 }
 
 void connect_send(){
+  delay(2000);
   if (WIFI_Connect() == false) return;
   for (int i = 0; i <= max_counter; i++){
       if (rssi_vector[i] != 0) HTTP_Post(rssi_vector[i], i);    
@@ -141,14 +131,14 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks{
         counter               += increment_counter;
         rssi_vector[counter]  = advertisedDevice.getRSSI();
                 
-        #ifdef SERIAL_PRINT
-          Serial.printf("----------------\n");
-          Serial.print("Valor incrementado de counter: ");
-          Serial.println(increment_counter);
-          Serial.printf("RSSI   : %d\n", advertisedDevice.getRSSI());
-          Serial.printf("MAC    : %s\n", advertisedDevice.getAddress().toString().c_str());
-          Serial.printf("counter: %d\n", counter);
-        #endif
+#ifdef SERIAL_PRINT
+        Serial.printf("----------------\n");
+        Serial.print("Valor incrementado de counter: ");
+        Serial.println(increment_counter);
+        Serial.printf("RSSI   : %d\n", advertisedDevice.getRSSI());
+        Serial.printf("MAC    : %s\n", advertisedDevice.getAddress().toString().c_str());
+        Serial.printf("counter: %d\n", counter);
+#endif
       }
     }
 };
@@ -198,9 +188,9 @@ void setup(){
   dummy_connection();
   digitalWrite(LED, LOW);
   
-  #ifdef SERIAL_PRINT
+#ifdef SERIAL_PRINT
     Serial.printf("Iniciando scan BLE durante %d segs...\n", SCAN_TIME);
-  #endif
+#endif
 }
 void loop(){
   if (counter >= max_counter){
@@ -215,5 +205,4 @@ void loop(){
   BLE_Init();
   inicio = millis();
   BLE_StartScan();
-//  toggle_LED(10,240, 0);
 }
